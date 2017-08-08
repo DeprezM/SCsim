@@ -13,9 +13,12 @@ computeBaseMean <- function(distribution,
     }
   }
 
+  if (!missing(seed)) {
+    set.seed(seed)
+  }
+
   if (class(distribution) == "character" &
-      any(grepl(distribution, c("gamma", "negative binomial",
-                                "normal", "uniform")))){
+      any(grepl(distribution, c("gamma", "negative binomial")))){
 
     # Check parameters value depending on the the wanted distribution
     if (distribution == "gamma") {
@@ -32,23 +35,10 @@ computeBaseMean <- function(distribution,
         simulated <- rnbinom(size, size=fstParam, mu=sndParam)
       }
 
-    } else if (distribution == "normal") {
-      if (sndParam <= 0) {
-        stop("sndParam must be > 0")
-      } else {
-        simulated <- rnorm(size, mean=fstParam, sd=sndParam)
-      }
-
-    } else {
-      if (fstParam >= sndParam) {
-        stop("fstParam must be < sndParam")
-      } else {
-        simulated <- runif(size, min=fstParam, max=sndParam)
-      }
     }
   } else {
     stop("wrong distribution argument, must be one of ('binomial negative',
-         'gamma', 'normal', 'uniform')")
+         'gamma')")
   }
 
   return(simulated)

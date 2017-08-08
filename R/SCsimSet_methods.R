@@ -23,7 +23,8 @@
 #' population in our simulated dataset.
 #'@param pPop Scalar of class \code{"numeric"}, providing the proportion of
 #' each cell population in our dataset (percentage of cells per population).
-#' @param seed
+#'@param seed Scalar of class \code{"numeric"}, providing the random number
+#' generator (RNG) state for random number generation.
 #'
 #' Basal expression
 #'@param baseDistr **optional** Character string (one of "gamma",
@@ -33,6 +34,14 @@
 #' the 1st distribution parameter. ("gamma" : shape, "negative binomial" : size)
 #'@param baseSndParam **optional** Scalar of class \code{"numeric"}, providing
 #' the 2nd distribution parameter. ("gamma" : rate, "negative binomial" : mean)
+#'
+#'@param nbBatch **optional** Scalar of class \code{"numeric"}, providing the
+#' number of batch in the dataset (max. a batch every 100 cells).
+#'@param cellsPerBatch **optional** Vector of class \code{"numeric"}, providing
+#' the number of cells per batch.
+#'@param batchEffect **optional** Vector of class \code{"numeric"}, providing
+#' the mean shift in library size for each batch.
+#'
 #'
 #' Cell-to-cell biais
 #'@param cellDistr **optional** Character string (one of "gamma",
@@ -51,8 +60,8 @@
 #'    total number of genes (nGenes), total number of cells (nCells), total
 #'    number of cell population (nCells) and relative size / proportion of cell
 #'    populations (pPop).}
-#'    \item{\code{baseMeans}:}{Object of class \code{"DistrSet"}, which contains
-#'    distribution parameters of gene basal expression.}
+#'    \item{\code{baseMeans}:}{Object of class \code{"numeric"}, which contains
+#'    a vector with genes mean basal expression.}
 #'    \item{\code{cellBiais}:}{Object of class \code{"DistrSet"}, which contains
 #'    distribution parameters of cell-to-cell biais (capture efficiency, batch,
 #'    library size...)}
@@ -73,6 +82,16 @@
 #'}
 #'
 #' @details
+#' Parameters set up
+#'
+#' Basal expression parameters example range of value
+#' Gamma distribution: shape = [1.7 : 3], rate = [0.5 : 1.5]
+#' Negative Binomial distribution: size = [2 : 3], mu = [2 : 4] # low expression
+#'
+#' Batch effect : number of batch, maximum 1 batch per 100 cells
+#'
+#'
+#'
 #' Based on :
 #'      - the number of genes (nGenes)
 #'      - the number of cells (nCells)
@@ -112,6 +131,13 @@
 #'
 #' @export
 #' @examples
+#'
+
+#'
+#'
+#'
+#'
+#'
 
 
 newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed,
@@ -179,7 +205,7 @@ newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed,
 
   ## Check validity of nCells
   if (nCells < 100) {
-    stop("Simulated dataset must contain at least 50 cells")
+    stop("Simulated dataset must contain at least 100 cells")
   }
 
   ## Check validity of nPop
@@ -210,5 +236,5 @@ newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed,
 
 
   #### baseMeans ####
-  baseMeans <- computeBaseMean(distribution, fstParam, sndParam, size)
+  baseMeans <- computeBaseMean(distribution, fstParam, sndParam, size, seed)
 
