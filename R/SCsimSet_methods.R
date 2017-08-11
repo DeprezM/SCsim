@@ -152,14 +152,14 @@ newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed,
 {
 
   # Define default parameters
-  defaults <- list("nGenes" = 10000, "nCells" = 500, "nPop" = 2, "pPop" = 0.5,
-                   "seed" = 1,
-                   "baseDistr" = "gamma", "baseFstParam" = 2, "baseSndParam" = 0.7,
-                   "cellDistr" = "normal", "cellFstParam" = -1, "cellSndParam" = 0.25,
-                   "totalDEG" = 0.1, "dc" = 0.02, "de" = 0.68,
-                   "dp" = 0.15, "dm" = 0.15, "up" = 0.5, "mix" = 0.3,
-                   "cellMixed" = "constant",
-                   "dispersion" = 0.5, "dropoutPct" = 0.8)
+  # defaults <- list("nGenes" = 10000, "nCells" = 500, "nPop" = 2, "pPop" = 0.5,
+  #                  "seed" = 1,
+  #                  "baseDistr" = "gamma", "baseFstParam" = 2, "baseSndParam" = 0.7,
+  #                  "cellDistr" = "normal", "cellFstParam" = -1, "cellSndParam" = 0.25,
+  #                  "totalDEG" = 0.1, "dc" = 0.02, "de" = 0.68,
+  #                  "dp" = 0.15, "dm" = 0.15, "up" = 0.5, "mix" = 0.3,
+  #                  "cellMixed" = "constant",
+  #                  "dispersion" = 0.5, "dropoutPct" = 0.8)
 
 
   ## Checking if all arguments were provided
@@ -217,9 +217,9 @@ newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed,
     if (length(pPop) != nPop) {
       if (length(pPop) == 1) {
         message(paste0("! All cell population will have the same size: ",
-                       round(1/nPop,2), " %"))
-        pPop = rep(round(1/nPop,2), nPop - 1)
-        pPop = c(pPop, 1-sum(pPop))
+                       round(1/nPop,2)*100, " %"))
+        pPop = rep(round(1/nPop,2)*100, nPop - 1)
+        pPop = c(pPop, 100-sum(pPop))
       }
     } else if (sum(pPop) != 1) {
       stop("Sum of pProp must be equal to 1")
@@ -232,9 +232,15 @@ newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed,
                      nPop = nPop,
                      pPop = pPop)
 
-  #### seed ####
-
 
   #### baseMeans ####
+  message("-> Compute basal gene expression")
   baseMeans <- computeBaseMean(distribution, fstParam, sndParam, size, seed)
 
+  message("-> Compute batch effect")
+  baseMeans <- computeBatch(nbBatch, cellsPerBatch, batchEffect, nCells, seed)
+
+  message("-> Compute cell biais (library size variation)")
+  baseMeans <- computeLibrarySize(nPop, pPop, nCells, seed)
+
+  message("-> Compute DEG")

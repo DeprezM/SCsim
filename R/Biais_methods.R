@@ -1,4 +1,4 @@
-# Batch
+#-----------------------------------------------------------------------------#
 
 computeBatch <- function(nbBatch, cellsPerBatch, batchEffect, nCells, seed){
   for (dataname in c("nbBatch", "cellsPerBatch","batchEffect")) {
@@ -20,8 +20,8 @@ computeBatch <- function(nbBatch, cellsPerBatch, batchEffect, nCells, seed){
     cellsPerBatch <- cellsPerBatch[1:nbBatch]
   } else if (length(cellsPerBatch) == 1) {
     message(paste0("All batch will have the same size: ",
-                   round(1/nbBatch,2)*100, " %"))
-    cellsPerBatch <- rep(round(1/nbBatch,2)*100, nbBatch - 1)
+                   ceiling(1/nbBatch,2)*100, " %"))
+    cellsPerBatch <- rep(ceiling(1/nbBatch,2)*100, nbBatch - 1)
     cellsPerBatch = c(cellsPerBatch, 100-sum(cellsPerBatch))
   } else if (length(cellsPerBatch) < nbBatch) {
     stop("argument cellsPerBatch must be of length equal to the number
@@ -53,9 +53,10 @@ computeBatch <- function(nbBatch, cellsPerBatch, batchEffect, nCells, seed){
   shiftInBatch <- list()
 
   for(i in 1:(nbBatch-1)){
-    cellsInBatch[[i]] <- sample(cellsID, round((cellsPerBatch/100) * nCells))
-    shiftInBatch[[i]] <- rnorm(round((cellsPerBatch/100) * nCells,
-                                     mean=batchEffect[i], sd=0.5))
+    cellsInBatch[[i]] <- sample(cellsID,
+                                ceiling((cellsPerBatch[i]/100) * nCells))
+    shiftInBatch[[i]] <- rnorm(ceiling((cellsPerBatch[i]/100) * nCells),
+                                     mean=batchEffect[i], sd=0.5)
     cellsID <- cellsID[!cellsID %in% cellsInBatch[[i]]]
   }
 
@@ -64,4 +65,22 @@ computeBatch <- function(nbBatch, cellsPerBatch, batchEffect, nCells, seed){
                                          mean=batchEffect[nbBatch], sd=0.5)
 
   return(list(cellsInBatch, shiftInBatch))
+}
+
+#-----------------------------------------------------------------------------#
+
+computeLibrarySize <- function(nPop, pPop, nCells, seed){
+
+  if (!missing(seed)) {
+    set.seed(seed)
+  }
+
+  libSize <- list()
+
+  for (i in 1:(nPop-1)){
+    libSize[[i]] <- rnorm(ceiling((pPop[i]/100) * nCells), mean = 0, sd = 1)
+  }
+  libSize[[nPop]] <- rnorm(nCells - length(unlist(libSize)), mean = 0, sd = 1)
+
+  return(libSize)
 }
