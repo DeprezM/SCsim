@@ -144,7 +144,6 @@ newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed,
                         baseDistr, baseFstParam, baseSndParam,
                         cellDistr, cellFstParam, cellSndParam,
                         totalDEG, dc, de, dp, dm, up, mix,
-                        cellMixed = "constant",
                         upFcDistr = NULL, upFcFstParam = NULL, upFcSndParam = NULL,
                         downFcDistr = NULL, downFcFstParam = NULL, downFcSndParam = NULL,
                         dispersion, dropoutPct)
