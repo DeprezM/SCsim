@@ -133,11 +133,12 @@
 #' @examples
 #'
 
-#'
-#'
-#'
-#'
-#'
+
+
+
+
+
+
 
 
 newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed,

@@ -5,7 +5,7 @@
 #'
 
 # DEG_table <- describeDEG(nGenes = 1000, nCells = 100, nPop = 3,
-#                          pPop = c(15, 35, 50), pDEG = c(15, 35, 50),
+#                          pPop = c(15, 35, 50), pDEG = c(20, 30, 10),
 #                          pDE = c(40, 10, 20), pDP = 20, pDM = c(30, 60, 50), pDC = 10,
 #                          pUp = c(70, 50, 20), pDown= c(30, 50, 80))
 
@@ -202,16 +202,22 @@ describeDEG <- function(nGenes, nCells, nPop, pPop,
 # describeCells ===============================================================
 
 #' describeCells -> Associate cells with their DEG.
-cell_table <- describeCells(nCells = 100, nPop = 3, pPop = c(15,35,50),
-                          cellMixedDP = "pseudo", cellMixedDM = "pseudo", seed,
-                          popMixDP = NULL, mixDP = 25, mixDM = 25,
-                          trajectory = list(c(1,2,3)), doublet = 2, genesStatus)
+# cell_table <- describeCells(nCells = 100, nPop = 3, pPop = c(15,35,50),
+#                           cellMixedDP = "pseudo", cellMixedDM = "pseudo",
+#                           seed = NULL,
+#                           popMixDP = NULL, mixDP = 25, mixDM = 25,
+#                           trajectory = list(c(1,2,3)), doublet = 0, DEG_table)
 
 
 describeCells <- function(nCells, nPop, pPop,
                           cellMixedDP = "pseudo", cellMixedDM = "pseudo", seed,
                           popMixDP = NULL, mixDP = 25, mixDM = 25,
                           trajectory = NULL, doublet = 2, genesStatus) {
+
+  ## Checking arguments presence
+  if (is.null(genesStatus)) {
+    stop("missing argument : genesStatus")
+  }
 
   ## Checking the validity of numerical variable
   for (dataname in c("mixDP", "mixDM", "doublet")) {
@@ -237,6 +243,13 @@ describeCells <- function(nCells, nPop, pPop,
     }
   }
 
+  ## Check seed
+  if (!is.null(seed) & !class(seed) %in% c("numeric", "integer")){
+    stop("seed argument must be integer")
+  } else {
+    seed <- 75
+  }
+
   ## Check validity of popMixDP
   if (nPop > 2 & !is.null(popMixDP)) {
     nbDP <- length(unique(genesStatus[genesStatus$type == "DP", "population"]))
@@ -252,9 +265,10 @@ describeCells <- function(nCells, nPop, pPop,
   }
 
   for (i in 1:nPop) {
-    if (!is.null(popMixDP) & (length(popMixDP[[i]]) < 2 |
+    if (!is.null(popMixDP))
+      if ((length(popMixDP[[i]]) < 2 |
                               length(popMixDP[[i]]) > nPop - 1)) {
-      stop(paste0("element ", i, "of popMixDP must be in range from 2 to ",
+      stop(paste0("element ", i, " of popMixDP must be in range from 2 to ",
                   nPop - 1))
     }
   }
@@ -309,6 +323,8 @@ describeCells <- function(nCells, nPop, pPop,
     starts <- c(starts, popMixDP[[i]][1])
   }
   pPop <- pPop/100
+
+  nGenes <- nrow(genesStatus)
 
   ## Check validity of nPop
   if (nPop == 1) {
@@ -401,22 +417,11 @@ describeCells <- function(nCells, nPop, pPop,
           geneName <- genesStatus[(genesStatus$population == i) &
                                     genesStatus$type == type, "geneLabel"]
 
-          mixCell <- popMixDP[starts == i][[1]][2:length(
-            popMixDP[starts == i][[1]])]
+          if (i %in% starts){
+            mixCell <- popMixDP[starts == i][[1]][2:length(
+              popMixDP[starts == i][[1]])]
 
-          if (cellMixedDP == "constant"){
-            cell <- sample(colnames(
-              cellsStatus[, cellsStatus["cellPop", ] == i]),
-              round(((100 - mixDP) / 100) * sum(cellsStatus["cellPop", ] == i)))
-            for(c in mixCell){
-              cell <- c(cell, sample(colnames(
-                cellsStatus[, cellsStatus["cellPop", ] == c]),
-                round((mixDP / 100) * sum(cellsStatus["cellPop", ] == c))))
-            }
-            cellsStatus[geneName, cell ] <- i
-
-          } else if (cellMixedDP == "random"){
-            for (g in geneName){
+            if (cellMixedDP == "constant"){
               cell <- sample(colnames(
                 cellsStatus[, cellsStatus["cellPop", ] == i]),
                 round(((100 - mixDP) / 100) * sum(cellsStatus["cellPop", ] == i)))
@@ -426,51 +431,64 @@ describeCells <- function(nCells, nPop, pPop,
                   round((mixDP / 100) * sum(cellsStatus["cellPop", ] == c))))
               }
               cellsStatus[geneName, cell ] <- i
-            }
 
-          } else if (cellMixedDP == "pseudo"){
-            # cell in given population that will have mix values
-            fixedCell <- list(sample(colnames(
-              cellsStatus[, cellsStatus["cellPop", ] == i]),
-              round(((100 - mixDP)/ 100) * sum(cellsStatus["cellPop", ] == i))))
-
-            cellPop <- colnames(cellsStatus[, cellsStatus["cellPop", ] == i])
-            nbPopCell <- round((mixDP / 100) * sum(
-              cellsStatus["cellPop", ] == i))
-
-            # cell in related population that will have mix values
-            for(c in mixCell){
-              fixedCell <- c(fixedCell, list(sample(colnames(
-                cellsStatus[, cellsStatus["cellPop", ] == c]),
-                round((mixDP / 100) * sum(cellsStatus["cellPop", ] == c)))))
-            }
-
-            # for each DP genes
-            for (g in geneName){
-              # fixed cells mixing
-              cell <- sample(cellPop[cellPop %in% fixedCell[[1]]],
-                         ceiling(nbPopCell/2))
-
-              # random cells mixing
-              cell <- c(cell, sample(cellPop[!cellPop %in% fixedCell],
-                         floor(nbPopCell/2)))
-
-              for (c in mixCell){
-                tmpcellPop <- colnames(cellsStatus[, cellsStatus["cellPop",
-                                                                 ] == c])
-                # fixed cells mixing
-                cell <- c(cell, sample(tmpcellPop[tmpcellPop %in%
-                            fixedCell[[1+grep(c, mixCell)]]],
-                            round((length(fixedCell[[1+grep(c, mixCell)]])/2))))
-                cell <- c(cell, sample(tmpcellPop[!tmpcellPop %in%
-                            fixedCell[[1+grep(c, mixCell)]]],
-                            round((length(fixedCell[[1+grep(c, mixCell)]])/2))))
+            } else if (cellMixedDP == "random"){
+              for (g in geneName){
+                cell <- sample(colnames(
+                  cellsStatus[, cellsStatus["cellPop", ] == i]),
+                  round(((100 - mixDP) / 100) * sum(cellsStatus["cellPop", ] == i)))
+                for(c in mixCell){
+                  cell <- c(cell, sample(colnames(
+                    cellsStatus[, cellsStatus["cellPop", ] == c]),
+                    round((mixDP / 100) * sum(cellsStatus["cellPop", ] == c))))
+                }
+                cellsStatus[geneName, cell ] <- i
               }
-              cellsStatus[g, cellPop[!cellPop %in% cell ]] <- i
-              cellsStatus[g, cell[!cell %in% cellPop ]] <- i
 
-            } # for geneName
-          } # if geneMix
+            } else if (cellMixedDP == "pseudo"){
+              # cell in given population that will have mix values
+              fixedCell <- list(sample(colnames(
+                cellsStatus[, cellsStatus["cellPop", ] == i]),
+                round(((100 - mixDP)/ 100) * sum(cellsStatus["cellPop", ] == i))))
+
+              cellPop <- colnames(cellsStatus[, cellsStatus["cellPop", ] == i])
+              nbPopCell <- round((mixDP / 100) * sum(
+                cellsStatus["cellPop", ] == i))
+
+              # cell in related population that will have mix values
+              for(c in mixCell){
+                fixedCell <- c(fixedCell, list(sample(colnames(
+                  cellsStatus[, cellsStatus["cellPop", ] == c]),
+                  round((mixDP / 100) * sum(cellsStatus["cellPop", ] == c)))))
+              }
+
+              # for each DP genes
+              for (g in geneName){
+                # fixed cells mixing
+                cell <- sample(cellPop[cellPop %in% fixedCell[[1]]],
+                               ceiling(nbPopCell/2))
+
+                # random cells mixing
+                cell <- c(cell, sample(cellPop[!cellPop %in% fixedCell],
+                                       floor(nbPopCell/2)))
+
+                for (c in mixCell){
+                  tmpcellPop <- colnames(cellsStatus[, cellsStatus["cellPop",
+                                                                   ] == c])
+                  # fixed cells mixing
+                  cell <- c(cell, sample(tmpcellPop[tmpcellPop %in%
+                                                      fixedCell[[1+grep(c, mixCell)]]],
+                                         round((length(fixedCell[[1+grep(c, mixCell)]])/2))))
+                  cell <- c(cell, sample(tmpcellPop[!tmpcellPop %in%
+                                                      fixedCell[[1+grep(c, mixCell)]]],
+                                         round((length(fixedCell[[1+grep(c, mixCell)]])/2))))
+                }
+                cellsStatus[g, cellPop[!cellPop %in% cell ]] <- i
+                cellsStatus[g, cell[!cell %in% cellPop ]] <- i
+
+              } # for geneName
+            } # if cellMix
+          } # if i in starts
         } # if geneType
       } # for type in DEG
     } # for cell population
@@ -485,3 +503,202 @@ describeCells <- function(nCells, nPop, pPop,
   } # if nPop
   return(cellsStatus)
 }
+
+# computeFC ===================================================================
+
+FC_table <- computeFC(genesStatus, seed = 25, trajectory = list(c(1,2,3)),
+                      popMixDP = NULL,
+                      distrUpFc = "medium", distrDownFc = "medium")
+
+computeFC <- function(genesStatus, seed, trajectory = NULL, popMixDP = NULL,
+                      distrUpFc = "medium", distrDownFc = "medium") {
+
+  ## Checking arguments presence
+  if (is.null(genesStatus)) {
+    stop("missing argument : genesStatus")
+  }
+
+  ## Get simulated dataset dimension
+  nPop <- max(genesStatus$population)
+  nGenes <- nrow(genesStatus)
+  nDegUp <- sum(as.character(genesStatus$regulation) == "Up")
+  nDegDown <- sum(as.character(genesStatus$regulation) == "Down")
+
+  ## Check validity of distr.. arguments
+  if (!distrUpFc %in% c("small", "medium", "high")){
+    stop("argument distrUpFc must be one of small / medium / high")
+  }
+
+  if (!distrDownFc %in% c("small", "medium", "high")){
+    stop("argument distrDownFc must be one of small / medium / high")
+  }
+
+  set.seed(seed)
+
+  if (distrUpFc == "small"){
+    UpFc <- rnbinom(mu = 18, size = 24, n = nDegUp) / 10
+  } else if (distrUpFc == "medium") {
+    UpFc <- rnbinom(mu = 25, size = 24, n = nDegUp) / 10
+  } else if (distrUpFc == "high") {
+    UpFc <- rnbinom(mu = 35, size = 24, n = nDegUp) / 10
+  }
+
+  if (distrDownFc == "small"){
+    DownFc <- -(rnbinom(mu = 12, size = 24, n = nDegDown) / 10)
+  } else if (distrDownFc == "medium") {
+    DownFc <- -(rnbinom(mu = 20, size = 24, n = nDegDown) / 10)
+  } else if (distrDownFc == "high") {
+    DownFc <- -(rnbinom(mu = 25, size = 24, n = nDegDown) / 10)
+  }
+
+
+  ## Create/ Initialize trueFc dataframe
+  trueFc <- data.frame(matrix(data = 0,
+                              nrow = nGenes,
+                              ncol = nPop))
+  rownames(trueFc) <- genesStatus$geneLabel
+
+  # Complete trueFc dataframe for DE, DP and DM DEG type
+  set.seed(seed)
+  for (x in 1:nPop) {
+    tmpIndexDEGup <- genesStatus[genesStatus$population == x &
+                          genesStatus$regulation == "Up", "geneLabel"]
+    tmpIndexDEGdown <- genesStatus[genesStatus$population == x &
+                            genesStatus$regulation == "Down", "geneLabel"]
+    trueFc[tmpIndexDEGup, x] <- sample(UpFc, length(tmpIndexDEGup))
+    trueFc[tmpIndexDEGdown, x] <- sample(DownFc, length(tmpIndexDEGdown))
+  }
+
+  # Complete trueFc dataframe for DC DEG type
+  if (any(grepl("DC", unique(as.character(genesStatus$type))))) {
+    if (!is.null(trajectory)){
+      for (x in 1:nPop){
+        nbTraj <- grep(x, trajectory)
+        tmpDC <- genesStatus[genesStatus$population == x &
+                               genesStatus$type == "DC", "geneLabel"]
+        if (length(nbTraj) > 1){
+          trajIndex <- list()
+          for (i in 1:(length(nbTraj) - 1)) {
+            trajIndex <- c(trajIndex, list(sample(tmpDC,
+                               floor(length(tmpDC)/length(nbTraj)))))
+            tmpDC <- tmpDC[!tmpDC %in% trajIndex[[i]]]
+          }
+          trajIndex <- c(trajIndex, list(tmpDC))
+        } else {
+          trajIndex <- list(tmpDC)
+        }
+
+        for (i in 1:length(nbTraj)) {
+          tmpTraj <- trajectory[[nbTraj[i]]]
+          # Increase expression
+          trajIndexInc <- trajIndex[[i]][1:floor(length(trajIndex[[i]])/2)]
+          # Decrease expression
+          trajIndexDec <- trajIndex[[i]][floor(length(trajIndex[[i]])/2):
+                                           length(trajIndex[[i]])]
+
+          # Down half
+          for (t in trajIndexInc) {
+            tmp_sample <- sample(DownFc,
+                                 length(tmpTraj[1:floor(length(tmpTraj)/2)]))
+            if (any(duplicated(tmp_sample))) {
+              tmp_sample[duplicated(tmp_sample)] <-
+                2*tmp_sample[duplicated(tmp_sample)]
+            }
+            trueFc[t, tmpTraj[1:floor(length(tmpTraj)/2)]] <- sort(tmp_sample)
+
+            tmp_sample <- sample(UpFc, length(tmpTraj[(ceiling(
+              length(tmpTraj)/2)+1):length(tmpTraj)]))
+            if (any(duplicated(tmp_sample))) {
+              tmp_sample[duplicated(tmp_sample)] <-
+                2*tmp_sample[duplicated(tmp_sample)]
+            }
+            trueFc[t, tmpTraj[(ceiling(length(tmpTraj)/2)
+                               +1):length(tmpTraj)]] <- sort(tmp_sample)
+          }
+
+          for (t in trajIndexDec) {
+            tmp_sample <- sample(UpFc,
+                                 length(tmpTraj[1:floor(length(tmpTraj)/2)]))
+            if (any(duplicated(tmp_sample))) {
+              tmp_sample[duplicated(tmp_sample)] <-
+                2*tmp_sample[duplicated(tmp_sample)]
+            }
+            if (length(tmp_sample) != 1) {
+              trueFc[t, tmpTraj[1:floor(length(tmpTraj)/2)]] <- sort(tmp_sample,
+                                                                decreasing = T)
+            } else {
+              trueFc[t, tmpTraj[1:floor(length(tmpTraj)/2)]] <- tmp_sample
+            }
+            tmp_sample <- sample(DownFc, length(tmpTraj[(
+              ceiling(length(tmpTraj)/2)+1):length(tmpTraj)]))
+            if (any(duplicated(tmp_sample))) {
+              tmp_sample[duplicated(tmp_sample)] <-
+                2*tmp_sample[duplicated(tmp_sample)]
+            }
+            if (length(tmp_sample) != 1) {
+              trueFc[t, tmpTraj[(ceiling(length(tmpTraj)/2)
+                     +1):length(tmpTraj)]] <- sort(tmp_sample, decreasing = T)
+            } else {
+              trueFc[t, tmpTraj[(ceiling(length(tmpTraj)/2)
+                                 +1):length(tmpTraj)]] <- tmp_sample
+            }
+
+
+          }
+        }
+      }
+    } else if (!is.null(popMixDP)) {
+      for (x in 1:nPop){
+        nbTraj <- grep(x, popMixDP)
+        tmpDC <- genesStatus[genesStatus$population == x &
+                               genesStatus$type == "DC", "geneLabel"]
+        if (length(nbTraj) > 1){
+          trajIndex <- list()
+          for (i in 1:(length(nbTraj) - 1)) {
+            trajIndex <- c(trajIndex, list(sample(tmpDC,
+                              floor(length(tmpDC)/length(nbTraj)))))
+            tmpDC <- tmpDC[!tmpDC %in% trajIndex[[i]]]
+          }
+          trajIndex <- c(trajIndex, list(tmpDC))
+        } else {
+          trajIndex <- list(tmpDC)
+        }
+
+        for (i in 1:length(nbTraj)) {
+          tmpTraj <- popMixDP[[nbTraj[i]]]
+          # Increase expression
+          trajIndexInc <- trajIndex[[i]][1:floor(length(trajIndex[[i]])/2)]
+          # Decrease expression
+          trajIndexDec <- trajIndex[[i]][floor(length(trajIndex[[i]])/2):
+                                           length(trajIndex[[i]])]
+
+          # Down half
+          for (t in trajIndexInc) {
+            tmp_sample <- sample(UpFc, length(tmpTraj))
+            if (any(duplicated(tmp_sample))) {
+              tmp_sample[duplicated(tmp_sample)] <-
+                2*tmp_sample[duplicated(tmp_sample)]
+            }
+            trueFc[t, tmpTraj] <- sort(tmp_sample)
+          }
+
+          for (t in trajIndexDec) {
+            tmp_sample <- sample(DownFc, length(tmpTraj))
+            if (any(duplicated(tmp_sample))) {
+              tmp_sample[duplicated(tmp_sample)] <-
+                2*tmp_sample[duplicated(tmp_sample)]
+            }
+            if (length(tmp_sample) != 1) {
+              trueFc[t, tmpTraj] <- sort(tmp_sample, decreasing = T)
+            } else {
+              trueFc[t, tmpTraj] <- tmp_sample
+            }
+
+          }
+        }
+      }
+    }
+  }
+  return(trueFc)
+}
+
