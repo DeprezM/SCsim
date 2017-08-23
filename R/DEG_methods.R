@@ -106,10 +106,8 @@ describeDEG <- function(nGenes, nCells, nPop, pPop,
 
     popIndex <- 1
     for (pop in 1:nPop) {
-      print(pop)
       genesStatus$population[popIndex:(popIndex + nDEGpop[pop] - 1)] <-
         rep(pop, nDEGpop[pop])
-      print(nDEGpop[pop])
       geneType <- c()
       geneReg <- c()
 
@@ -159,9 +157,6 @@ describeDEG <- function(nGenes, nCells, nPop, pPop,
       geneType <- c(rep("DE", nDEGpop[pop]-length(geneType)), geneType)
       geneReg <- c(rep("Up", nDEGpop[pop]-length(geneType)), geneReg)
 
-      print(length(geneType))
-      print(length(geneReg))
-
       genesStatus$type[popIndex:(popIndex + nDEGpop[pop] - 1)] <- geneType
       genesStatus$regulation[popIndex:(popIndex + nDEGpop[pop] - 1)] <- geneReg
 
@@ -209,8 +204,8 @@ describeDEG <- function(nGenes, nCells, nPop, pPop,
 #                           trajectory = list(c(1,2,3)), doublet = 0, DEG_table)
 
 
-describeCells <- function(nCells, nPop, pPop,
-                          cellMixedDP = "pseudo", cellMixedDM = "pseudo", seed,
+describeCells <- function(nCells, nPop, pPop, seed,
+                          cellMixedDP = "pseudo", cellMixedDM = "pseudo",
                           popMixDP = NULL, mixDP = 25, mixDM = 25,
                           trajectory = NULL, doublet = 2, genesStatus) {
 
@@ -493,11 +488,13 @@ describeCells <- function(nCells, nPop, pPop,
       } # for type in DEG
     } # for cell population
     if (doublet != 0){
-      dbCell <- sample(colnames(cellsStatus), floor((doublet / 100)*nCells)*2)
+      dbCell <- sample(colnames(cellsStatus), floor((doublet / 100)*nCells))
+      tmpDb <- sample(colnames(cellsStatus)[!colnames(cellsStatus) %in% dbCell],
+                      floor((doublet / 100)*nCells)*2)
       for (c in dbCell){
-        cellsStatus["cellPop", c] <- paste(c(c, sample(colnames(cellsStatus)[
-          !colnames(cellsStatus) %in% dbCell],
-          round(runif(1, min = 1, max = 2)))), collapse = "_")
+        pick <- sample(tmpDb, round(runif(1, min = 2, max = 3)))
+        cellsStatus["cellPop", c] <- paste(pick, collapse = "_")
+        tmpDb <- tmpDb[!tmpDb %in% pick]
       }
     }
   } # if nPop
@@ -506,9 +503,9 @@ describeCells <- function(nCells, nPop, pPop,
 
 # computeFC ===================================================================
 
-FC_table <- computeFC(genesStatus, seed = 25, trajectory = list(c(1,2,3)),
-                      popMixDP = NULL,
-                      distrUpFc = "medium", distrDownFc = "medium")
+# FC_table <- computeFC(genesStatus, seed = 25, trajectory = list(c(1,2,3)),
+#                       popMixDP = NULL,
+#                       distrUpFc = "medium", distrDownFc = "medium")
 
 computeFC <- function(genesStatus, seed, trajectory = NULL, popMixDP = NULL,
                       distrUpFc = "medium", distrDownFc = "medium") {
@@ -536,24 +533,24 @@ computeFC <- function(genesStatus, seed, trajectory = NULL, popMixDP = NULL,
   set.seed(seed)
 
   if (distrUpFc == "small"){
-    UpFc <- rnbinom(mu = 18, size = 24, n = nDegUp) / 10
+    UpFc <- rnbinom(mu = 8, size = 20, n = nDegUp) / 10
   } else if (distrUpFc == "medium") {
-    UpFc <- rnbinom(mu = 25, size = 24, n = nDegUp) / 10
+    UpFc <- rnbinom(mu = 12, size = 24, n = nDegUp) / 10
   } else if (distrUpFc == "high") {
-    UpFc <- rnbinom(mu = 35, size = 24, n = nDegUp) / 10
+    UpFc <- rnbinom(mu = 16, size = 28, n = nDegUp) / 10
   }
 
   if (distrDownFc == "small"){
-    DownFc <- -(rnbinom(mu = 12, size = 24, n = nDegDown) / 10)
+    DownFc <- -(rnbinom(mu = 8, size = 22, n = nDegDown) / 10)
   } else if (distrDownFc == "medium") {
-    DownFc <- -(rnbinom(mu = 20, size = 24, n = nDegDown) / 10)
+    DownFc <- -(rnbinom(mu = 12, size = 26, n = nDegDown) / 10)
   } else if (distrDownFc == "high") {
-    DownFc <- -(rnbinom(mu = 25, size = 24, n = nDegDown) / 10)
+    DownFc <- -(rnbinom(mu = 16, size = 30, n = nDegDown) / 10)
   }
 
 
   ## Create/ Initialize trueFc dataframe
-  trueFc <- data.frame(matrix(data = 0,
+  trueFc <- data.frame(matrix(data = 1,
                               nrow = nGenes,
                               ncol = nPop))
   rownames(trueFc) <- genesStatus$geneLabel
