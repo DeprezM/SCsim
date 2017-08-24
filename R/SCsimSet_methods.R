@@ -183,11 +183,11 @@ newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed = 75,
     if (length(pPop) != nPop) {
       if (length(pPop) == 1) {
         message(paste0("! All cell population will have the same size: ",
-                       round(1/nPop,2), " %"))
-        pPop = rep(round(1/nPop,2), nPop - 1)
-        pPop = c(pPop, 1-sum(pPop))
+                       round(100/nPop,2), " %"))
+        pPop = rep(round(100/nPop,2), nPop - 1)
+        pPop = c(pPop, 100-sum(pPop))
       }
-    } else if (sum(pPop) != 1) {
+    } else if (sum(pPop) != 100) {
       stop("sum of popProp must be equal to 1")
     }
   }
@@ -363,7 +363,7 @@ newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed = 75,
   for (i in 1:nPop){
     cellPopId <- c(cellPopId, rep(i, length(libSize[[i]])))
   }
-  lib_df <- rbind(population = as.integer(cellPopId),
+  lib_df <- data.frame(population = as.integer(cellPopId),
                   librarySize = unlist(libSize))
 
   # Batch dataFrame
@@ -402,9 +402,6 @@ newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed = 75,
                   baseCounts = baseCounts,
                   effectiveCounts = effectiveCounts)
 
-  ## Check object validity
-  #validObject(distrset)
   scsimset
-
 }
 

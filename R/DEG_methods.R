@@ -490,7 +490,7 @@ describeCells <- function(nCells, nPop, pPop, seed,
     if (doublet != 0){
       dbCell <- sample(colnames(cellsStatus), floor((doublet / 100)*nCells))
       tmpDb <- sample(colnames(cellsStatus)[!colnames(cellsStatus) %in% dbCell],
-                      floor((doublet / 100)*nCells)*2)
+                      floor((doublet / 100)*nCells)*3)
       for (c in dbCell){
         pick <- sample(tmpDb, round(runif(1, min = 2, max = 3)))
         cellsStatus["cellPop", c] <- paste(pick, collapse = "_")

@@ -47,13 +47,14 @@
 
 setClass("SCsimSet",
          slots = c(sampleInfo = "list",
-                   baseMeans = "DistrSet",
-                   cellBiais = "DistrSet",
-                   FcDeg = "FCSet",
-                   countDispersion = "numeric",
-                   dropoutPct = "numeric",
+                   batch_table = "data.frame",
+                   lib_df = "data.frame",
+                   DEG_df = "data.frame",
+                   cell_table = "data.frame",
                    dropout = "matrix",
+                   baseMeans = "numeric",
                    effectiveMeans = "matrix",
                    baseCounts = "matrix",
-                   effectiveCounts = "matrix")
+                   effectiveCounts = "matrix"
+                   )
 )
