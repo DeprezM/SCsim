@@ -41,8 +41,15 @@ computeBatch <- function(nbBatch, cellsPerBatch, batchEffect, nCells, seed) {
   }
 
   if (is.null(batchEffect)) {
-    batchEffect <- sample(c(runif(nbBatch * 2, min = 0.25, max = 0.75),
-                            runif(nbBatch * 2, min = 1.25, max = 4)), nbBatch)
+    batchEffect <- c(1)
+    while (length(batchEffect) < nbBatch) {
+      tmpBatch <- sample(c(runif(nbBatch * 2, min = 0.20, max = 0.80),
+                           runif(nbBatch * 2, min = 1.20, max = 4.05)), 1)
+      if ((length(batchEffect) > 5) |
+          (abs(batchEffect[length(batchEffect)] - tmpBatch) > 0.5)) {
+        batchEffect <- c(batchEffect, tmpBatch)
+      }
+    }
   }
 
   if(length(batchEffect) > nbBatch){
@@ -80,10 +87,10 @@ computeLibrarySize <- function(nPop, pPop, nCells, seed){
 
   for (i in 1:(nPop-1)){
     libSize[[i]] <- abs(rnorm(ceiling((pPop[i]/100) * nCells),
-                              mean = 1, sd = 0.5))
+                              mean = 1, sd = 0.25))
   }
   libSize[[nPop]] <- abs(rnorm(nCells - length(unlist(libSize)),
-                               mean = 1, sd = 0.5))
+                               mean = 1, sd = 0.25))
 
   return(libSize)
 }
