@@ -197,7 +197,8 @@ newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed = 75,
   sampleInfo <- list(nGenes = nGenes,
                      nCells = nCells,
                      nPop = nPop,
-                     pPop = pPop)
+                     pPop = pPop,
+                     baseMean = c(distribution, fstParam, sndParam))
 
   # Basal gene expression
   message("-> Compute basal gene expression")
@@ -305,16 +306,16 @@ newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed = 75,
     # Assign dropout probability
     # dropoutProba <- (1/(pi * (1 + x^2))) * (1/max(1/(pi * (1 + x^2))))
     # dropoutProba <- 1 * exp(-1 * log2(genesExpression+1))
-    lambda <- 0.1
+    lambda <- 0.4
     dropoutProba <- abs(((lambda * exp(-lambda * genesExpression)) /
                       (max(lambda * exp(-lambda * genesExpression)) + 0.025)))
 
     for (i in 1:length(dropoutProba)) {
       rdm <- runif(1, min = 0, max = 1)
       if (rdm < 0.2) {
-        dropoutProba[[i]] <- dropoutProba[[i]] + runif(1, min = 0, max = 0.3)
+        dropoutProba[[i]] <- dropoutProba[[i]] + runif(1, min = 0, max = 0.2)
       } else if (rdm > 0.8) {
-        dropoutProba[[i]] <- dropoutProba[[i]] - runif(1, min = 0, max = 0.2)
+        dropoutProba[[i]] <- dropoutProba[[i]] - runif(1, min = 0, max = 0.1)
       }
 
       if (dropoutProba[[i]] >= 1) {
@@ -336,13 +337,14 @@ newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed = 75,
         rdm <- runif(1, min = 0, max = 1)
         if (g > length(rdmGenes)) {
           g <- 1
-          rdmGenes <- rdmGenes[dropout[rdmGenes, i] !=  0]
+          rdmGenes <- sample(rdmGenes, length(rdmGenes))
         }
         rdmGene <- rdmGenes[g]
         if (rdm < dropoutProba[[rdmGene]]) {
           dropout[rdmGene, i] <- 0
           effectiveCounts[rdmGene, i] <- 0
           nbZero <- sum(effectiveCounts[, i] == 0)
+          rdmGenes <- rdmGenes[rdmGenes != rdmGene]
         }
         g <- g + 1
       }
@@ -405,3 +407,520 @@ newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed = 75,
   scsimset
 }
 
+# Graphic functions ===========================================================
+
+setMethod("plotDatasetInfo", "SCsimSet",
+   function(object) {
+     tmpTibble <- tibble::tibble(pPop = object@sampleInfo$pPop,
+                                 nPop = as.factor(1:object@sampleInfo$nPop))
+     gene <- paste0("  ", object@sampleInfo$nGenes, " Genes  ")
+     cell <- paste0("  ", object@sampleInfo$nCells, " Cells  ")
+
+     ggplot2::ggplot(tmpTibble, ggplot2::aes(x="", y=pPop)) +
+       ggplot2::geom_bar(ggplot2::aes(fill = nPop), stat = "identity") +
+       ggplot2::scale_y_continuous(labels = function(x){ paste0(x, "%") }) +
+       ggplot2::coord_flip() +
+       ggplot2::ggtitle(bquote(" " %<-% .(cell) %->% " ")) +
+       ggplot2::xlab(bquote(" " %<-% .(gene) %->% " ")) +
+       ggplot2::labs(y = "") +
+       ggplot2::scale_fill_discrete(name="Cell \nPopulation") +
+       # ggplot2::theme_bw() +
+       ggplot2::theme(
+         plot.title = ggplot2::element_text(hjust = 0.5, size = 13),
+         axis.text.y = ggplot2::element_blank(),
+         axis.title.y = ggplot2::element_text(size = 12),
+         axis.ticks.y = ggplot2::element_blank(),
+         axis.title.x = ggplot2::element_text( size = 13),
+         axis.text.x = ggplot2::element_text(size = 12),
+         legend.background = ggplot2::element_rect(fill = "transparent",
+                                                   colour = "grey20"),
+         legend.position = "bottom",
+         plot.margin = grid::unit(c(1.5,1.5,1.5,1.5), "lines"),
+         plot.background = ggplot2::element_rect(fill = "transparent"),
+         panel.background = ggplot2::element_rect(fill = "transparent"),
+         panel.border = ggplot2::element_blank(),
+         panel.grid.major = ggplot2::element_blank(),
+         panel.grid.minor = ggplot2::element_blank())
+
+   }
+)
+
+
+setMethod("plotBaseMean", "SCsimSet",
+   function(object) {
+     tmpTibble <- tibble::tibble(simulated = object@baseMeans)
+     bin <- (max(tmpTibble$simulated) - min(tmpTibble$simulated))/100
+     ggplot2::ggplot(tmpTibble, ggplot2::aes(x=simulated)) +
+       ggplot2::geom_histogram(ggplot2::aes(y = ..density..),
+                               colour = "deepskyblue3", fill = "deepskyblue1",
+                               alpha=1/3, binwidth = bin) +
+       ggplot2::geom_line(ggplot2::aes(x=simulated), stat = 'density',
+                          colour = "brown4", size = 0.7) +
+       ggplot2::annotate("text", y= Inf, x = Inf, hjust = 1, vjust = 1.5,
+                         label = paste0("Distribution = ",
+                                        object@sampleInfo$baseMean[1]),
+                         colour="grey20", size = 4) +
+       ggplot2::xlab("Gene expression") +
+       ggplot2::ylab("Density") +
+       ggplot2::theme(axis.text = ggplot2::element_text(size=11),
+         axis.title = ggplot2::element_text(colour="grey20", size = 12),
+         axis.line = ggplot2::element_line(colour = "grey30"),
+         legend.background = ggplot2::element_rect(fill = "transparent",
+                                                   colour = "grey20"),
+         plot.background = ggplot2::element_rect(fill = "transparent"),
+         panel.background = ggplot2::element_rect(fill = "transparent"),
+         panel.border = ggplot2::element_blank(),
+         panel.grid.major = ggplot2::element_blank(),
+         panel.grid.minor = ggplot2::element_blank())
+  })
+
+setMethod("plotBatchInDataset", "SCsimSet",
+   function(object) {
+     batch_prop <- round(((as.vector(table(object@batch_table[,
+           c("population","batchId")])))/object@sampleInfo$nCells)*100)
+
+     tmpTibble <- tibble::tibble(
+       pPop = rep(rep(object@sampleInfo$pPop,
+                      length(unique(object@batch_table$batchId))),batch_prop),
+       nPop = rep(rep(as.factor(1:object@sampleInfo$nPop),
+                      length(unique(object@batch_table$batchId))),batch_prop),
+       batchID = rep(as.factor(sort(rep(unique(object@batch_table$batchId),
+                                        object@sampleInfo$nPop))),batch_prop))
+
+
+     ggplot2::ggplot(tmpTibble, ggplot2::aes(x=nPop, color = nPop,
+                                                    fill = batchID)) +
+       ggplot2::geom_bar(stat = "count", size=0.8) +
+       ggplot2::scale_fill_brewer(palette="Greys", name="Batch")+
+       ggplot2::scale_colour_discrete(name = "Cell \npopulation") +
+       ggplot2::scale_y_continuous(labels = function(x){
+         paste0(x, "%") }) +
+       ggplot2::xlab("Cell Population") +
+       ggplot2::labs(y = "Cell population proportion") +
+       ggplot2::theme(
+         plot.title = ggplot2::element_text(hjust = 0.5, size = 13),
+         axis.title.y = ggplot2::element_text(size = 12),
+         axis.ticks.y = ggplot2::element_blank(),
+         axis.title.x = ggplot2::element_text(colour = "grey30", size = 12),
+         axis.text.x = ggplot2::element_text(size = 12),
+         axis.text.y = ggplot2::element_text(size = 12),
+         legend.background = ggplot2::element_rect(fill = "transparent",
+                                                   colour = "grey20"),
+         plot.margin = grid::unit(c(1.5,1.5,1.5,1.5), "lines"),
+         plot.background = ggplot2::element_rect(fill = "transparent"),
+         panel.background = ggplot2::element_rect(fill = "transparent"),
+         panel.border = ggplot2::element_blank(),
+         panel.grid.major = ggplot2::element_blank(),
+         panel.grid.minor = ggplot2::element_blank())
+
+   })
+
+
+setMethod("plotBatch", "SCsimSet",
+   function(object) {
+     tmpTibble <- tibble::as.tibble(object@batch_table[,
+                                      c("batchId", "batchValue")])
+     tmpTibble$batchId <- as.factor(tmpTibble$batchId)
+
+     ggplot2::ggplot(tmpTibble, ggplot2::aes(x = batchValue, fill = batchId)) +
+       ggplot2::geom_density(alpha = 0.5) +
+       ggplot2::scale_fill_brewer(palette="Greys", name="Batch") +
+       ggplot2::xlab("Batch Effect") +
+       ggplot2::ylab("Density") +
+       ggplot2::theme(
+         axis.line = ggplot2::element_line(colour = "grey30"),
+         axis.ticks.y = ggplot2::element_blank(),
+         axis.title = ggplot2::element_text(colour = "grey30", size = 13),
+         axis.text = ggplot2::element_text(size = 12),
+         legend.background = ggplot2::element_rect(fill = "transparent",
+                                                   colour = "grey20"),
+         plot.margin = grid::unit(c(1.5,1.5,1.5,1.5), "lines"),
+         plot.background = ggplot2::element_rect(fill = "transparent"),
+         panel.background = ggplot2::element_rect(fill = "transparent"),
+         panel.border = ggplot2::element_blank(),
+         panel.grid.major = ggplot2::element_blank(),
+         panel.grid.minor = ggplot2::element_blank())
+   })
+
+
+setMethod("plotCellBiais", "SCsimSet",
+   function(object) {
+     tmpTibble <- tibble::as.tibble(object@lib_df)
+     tmpTibble$population <- as.factor(tmpTibble$population)
+
+     ggplot2::ggplot(tmpTibble, ggplot2::aes(x = librarySize,
+                                             fill = population)) +
+       ggplot2::geom_density(alpha = 0.5) +
+       ggplot2::scale_fill_discrete(name="Population") +
+       ggplot2::xlab("Library Effect") +
+       ggplot2::ylab("Density") +
+       ggplot2::theme(
+         axis.line = ggplot2::element_line(colour = "grey30"),
+         axis.ticks.y = ggplot2::element_blank(),
+         axis.title = ggplot2::element_text(colour = "grey30", size = 13),
+         axis.text = ggplot2::element_text(size = 12),
+         legend.background = ggplot2::element_rect(fill = "transparent",
+                                                   colour = "grey20"),
+         plot.margin = grid::unit(c(1.5,1.5,1.5,1.5), "lines"),
+         plot.background = ggplot2::element_rect(fill = "transparent"),
+         panel.background = ggplot2::element_rect(fill = "transparent"),
+         panel.border = ggplot2::element_blank(),
+         panel.grid.major = ggplot2::element_blank(),
+         panel.grid.minor = ggplot2::element_blank())
+   })
+
+
+setMethod("plotLibrarySize", "SCsimSet",
+   function(object) {
+     tmpTibble <- tibble::tibble(librarySize = colSums(object@effectiveCounts),
+                    population = as.factor(object@lib_df$population))
+
+     ggplot2::ggplot(tmpTibble, ggplot2::aes(x = librarySize,
+                                             fill = population)) +
+       ggplot2::geom_density(alpha = 0.5) +
+       ggplot2::scale_fill_discrete(name="Population") +
+       ggplot2::xlab("Library Size") +
+       ggplot2::ylab("Density") +
+       ggplot2::theme(
+         axis.line = ggplot2::element_line(colour = "grey30"),
+         axis.ticks.y = ggplot2::element_blank(),
+         axis.title = ggplot2::element_text(colour = "grey30", size = 13),
+         axis.text = ggplot2::element_text(size = 12),
+         legend.background = ggplot2::element_rect(fill = "transparent",
+                                                   colour = "grey20"),
+         plot.margin = grid::unit(c(1.5,1.5,1.5,1.5), "lines"),
+         plot.background = ggplot2::element_rect(fill = "transparent"),
+         panel.background = ggplot2::element_rect(fill = "transparent"),
+         panel.border = ggplot2::element_blank(),
+         panel.grid.major = ggplot2::element_blank(),
+         panel.grid.minor = ggplot2::element_blank())
+  })
+
+setMethod("plotDEG", "SCsimSet",
+   function(object) {
+     tmp_pct <- as.data.frame((
+       table(object@DEG_df$population)/nrow(object@DEG_df))*100)
+     tmpTibble <- tibble::tibble(Percentage = tmp_pct[, 2],
+                             Population = paste0("Pop ", (tmp_pct[, 1])),
+                             Type = c("noDEG", rep("DEG", nrow(tmp_pct) - 1)))
+
+     tmp_color <- c("#d98c8c", "lightblue", "lightblue",
+                    get_color_hexa(nrow(tmp_pct)-1))
+     names(tmp_color) <- c("DEG", "noDEG", NA,
+                           paste0("Pop ", 1:(nrow(tmp_pct)-1)))
+
+     tmpTibble$Population[tmpTibble$Population == "Pop 0"] <- NA
+
+     ggplot2::ggplot(tmpTibble, ggplot2::aes(x = "", y = Percentage,
+                                             fill = Type)) +
+       ggplot2::geom_bar(stat = "identity", color = "grey20") +
+       ggplot2::scale_fill_manual(name = "Gene type",values = tmp_color) +
+       ggplot2::geom_label(ggplot2::aes(label=Population,
+                                        fill=factor(Population,
+                    levels = sort(tmpTibble$Population, decreasing = T))),
+                           na.rm = T, show.legend = F,
+                           position = ggplot2::position_stack(vjust = 0.5)) +
+       ggplot2::theme(
+         axis.text.x = ggplot2::element_blank(),
+         axis.title.x = ggplot2::element_blank(),
+         axis.ticks.x = ggplot2::element_blank(),
+         axis.title.y = ggplot2::element_text(colour = "grey30", size = 12),
+         axis.text.y = ggplot2::element_text(size = 11),
+         legend.background = ggplot2::element_rect(fill = "transparent",
+                                                   colour = "grey20"),
+         plot.margin = grid::unit(c(1,1,1,1), "lines"),
+         plot.background = ggplot2::element_rect(fill = "transparent"),
+         panel.background = ggplot2::element_rect(fill = "transparent"),
+         panel.border = ggplot2::element_blank(),
+         panel.grid.major = ggplot2::element_blank(),
+         panel.grid.minor = ggplot2::element_blank())
+
+   })
+
+setMethod("plotDEGTypes", "SCsimSet",
+   function(object) {
+     # Create data frame for plot
+     tmpTibble <- tibble::tibble(Gene = c("DE", "DM", "DP", "DC"))
+     col_n <- c("Gene", paste0("Pop ",
+                               1:(length(unique(object@DEG_df$population))-1)))
+     for (i in 1:(length(unique(object@DEG_df$population))-1)) {
+       tmp_pct <- as.data.frame((
+         table(object@DEG_df$type[object@DEG_df$population == i])/
+           nrow(object@DEG_df[object@DEG_df$population == i, ]))*100)
+       rownames(tmp_pct) <- tmp_pct$Var1
+       tmpTibble <- cbind(tmpTibble, tmp_pct[unlist(tmpTibble[,1]),2])
+     }
+     colnames(tmpTibble) <- col_n
+
+     tmpTibble <- tidyr::gather(tmpTibble, Population, Percentage,
+                                col_n[2:length(col_n)])
+     tmpTibble$Gene <- factor(tmpTibble$Gene,
+                              levels = c("DE", "DM", "DP", "DC"))
+
+     # create color scale
+     tmp_color <- c("#42668a", "#6199d1", "#669999", "#3d8f66",
+                    get_color_hexa(length(unique(tmpTibble$Population))))
+     names(tmp_color) <- c("DE", "DM", "DP", "DC",
+                    paste0("Pop ", 1:length(unique(tmpTibble$Population))))
+
+     # plot
+     ggplot2::ggplot(tmpTibble, ggplot2::aes(x = Population, y = Percentage,
+                                             fill=Gene)) +
+       ggplot2::geom_bar(stat = "identity", color = "grey30") +
+       ggplot2::scale_fill_manual(values=tmp_color, name = "Gene type") +
+       ggplot2::geom_label(ggplot2::aes(label=Population, fill = Population),
+                           na.rm = T, show.legend = F,
+                           position = ggplot2::position_fill(vjust = 0.5)) +
+       ggplot2::theme(
+         axis.text.x = ggplot2::element_blank(),
+         axis.title.x = ggplot2::element_blank(),
+         axis.ticks.x = ggplot2::element_blank(),
+         axis.title.y = ggplot2::element_text(colour = "grey50", size = 12),
+         axis.text.y = ggplot2::element_text(size = 11),
+         legend.background = ggplot2::element_rect(fill = "transparent",
+                                                   colour = "grey20"),
+         plot.margin = grid::unit(c(1,1,1,1), "lines"),
+         plot.background = ggplot2::element_rect(fill = "transparent"),
+         panel.background = ggplot2::element_rect(fill = "transparent"),
+         panel.border = ggplot2::element_blank(),
+         panel.grid.major = ggplot2::element_blank(),
+         panel.grid.minor = ggplot2::element_blank())
+
+   })
+
+
+setMethod("plotCellsContent", "SCsimSet",
+   function(object) {
+     tmpDF <- object@cell_table
+     tmpDF <- tmpDF[3:nrow(tmpDF),]
+     # Change DC value - Common DEG
+     tmpDF[tmpDF == -1 ] <- object@sampleInfo$nPop + 1
+     # Change doublet value
+     tmpDF[, ! object@cell_table[2,] %in% 1:object@sampleInfo$nPop] <- -1
+
+     # Gene Label & color
+     label <- rownames(tmpDF)
+     for (i in 1:length(rownames(tmpDF))) {
+       label[i] <- paste(unlist(strsplit(rownames(tmpDF)[i], "_"))[2:3],
+                         collapse = "_")
+     }
+     nDEGtype <- length(unique(label))
+     colorLabel <- RColorBrewer::brewer.pal(n=nDEGtype, name="Paired")
+     names(colorLabel) <- unique(label)
+
+     # Cell label & color
+     labelPop <- as.vector(object@cell_table[2,])
+     labelPop[!labelPop %in% 1:object@sampleInfo$nPop] <- "Doublet"
+     labelPop[labelPop %in% 1:object@sampleInfo$nPop] <- paste0("Pop ",
+                    labelPop[labelPop %in% 1:object@sampleInfo$nPop])
+
+     if (nPop <= 2) {
+       colorLabelPop <- RColorBrewer::brewer.pal(n=3,
+                           name="YlOrRd")[1:(object@sampleInfo$nPop + 1)]
+     } else {
+       colorLabelPop <- RColorBrewer::brewer.pal(n=(object@sampleInfo$nPop + 1),
+                                                 name="YlOrRd")
+     }
+     col_common <- colorLabelPop[length(colorLabelPop)]
+     colorLabelPop <- c("dodgerblue4",
+                        colorLabelPop[1:(length(colorLabelPop)-1)])
+
+     names(colorLabelPop) <- c("Doublet", paste0("Pop ",
+                                                 1:object@sampleInfo$nPop))
+
+     annot_col <- data.frame(Pop = unlist(labelPop))
+     rownames(annot_col) <- colnames(tmpDF)
+     annot_row <- data.frame(DEG = label)
+     rownames(annot_row) <- rownames(tmpDF)
+     annot_color <- list(DEG = colorLabel,
+                         Pop = colorLabelPop)
+     colorht <- c("dodgerblue4", "lightblue",
+                  colorLabelPop[2:length(colorLabelPop)], col_common)
+
+     pheatmap::pheatmap(tmpDF, color = colorht, border_color = NA,
+                        show_rownames = F, show_colnames = F,
+                        cluster_rows = F, cluster_cols = F,
+                        annotation_row = annot_row, annotation_col = annot_col,
+                        annotation_colors = annot_color,
+                        annotation_names_row = F, annotation_names_col = F)
+
+   })
+
+
+setMethod("plotDEGDensity", "SCsimSet",
+   function(object) {
+     degType <- as.character(unique(scSim@DEG_df$type))
+     degType <- degType[degType != "NDE"]
+     tmpTibble <- tibble::tibble()
+
+     for (type in degType) {
+       fc <- scSim@DEG_df[
+         (scSim@DEG_df$type == type) &
+           (scSim@DEG_df$regulation == "Up"),]
+       if (nrow(fc) > 1) {
+         topExpr <- sort(rowMeans(scSim@effectiveCounts[rownames(fc),]),
+                         decreasing = T)
+         fc <- fc[names(topExpr[1:5]),]
+         fc$max <- rowMeans(fc[4:ncol(fc)])
+         fc <- fc[with(fc, order(max, decreasing = T)),]
+         fc <- fc[rownames(fc[1,]),]
+       }
+       if (nrow(tmpTibble) == 0) {
+         tmpTibble <- tibble::tibble(
+           Count = log2(scSim@effectiveCounts[rownames(fc),] + 1),
+           Population = as.character(scSim@lib_df$population),
+           Type = rep(type, ncol(scSim@effectiveCounts)))
+       } else {
+         t <- tibble::tibble(
+           Count = log2(scSim@effectiveCounts[rownames(fc),] + 1),
+           Population = as.character(scSim@lib_df$population),
+           Type = rep(type, ncol(scSim@effectiveCounts)))
+         tmpTibble <- rbind(tmpTibble, t)
+       }
+     }
+
+     # NDE case
+     fc <- scSim@DEG_df[
+       (scSim@DEG_df$type == "NDE"),]
+     fc <- sort(rowMeans(scSim@effectiveCounts[rownames(fc),]),
+                decreasing = T)
+     if (nrow(tmpTibble) == 0) {
+       tmpTibble <- tibble::tibble(
+         Count = log2(scSim@effectiveCounts[names(fc[1]),] + 1),
+         Population = as.character(scSim@lib_df$population),
+         Type = rep("NDE", ncol(scSim@effectiveCounts)))
+     } else {
+       t <- tibble::tibble(
+         Count = log2(scSim@effectiveCounts[names(fc[1]),] + 1),
+         Population = as.character(scSim@lib_df$population),
+         Type = rep("NDE", ncol(scSim@effectiveCounts)))
+       tmpTibble <- rbind(tmpTibble, t)
+     }
+
+     ggplot2::ggplot(tmpTibble,
+                     ggplot2::aes(x = Count, fill = Population)) +
+       ggplot2::geom_density(alpha = 0.5) +
+       ggplot2::ylim(0,1) +
+       ggplot2::facet_grid(~Type)
+
+   })
+
+
+setMethod("plotDropoutQC", "SCsimSet",
+   function(object) {
+
+     isExpr_mat = object@baseCounts == 0
+     pctDropout_cells <- rowSums(isExpr_mat) / ncol(isExpr_mat) * 100
+     tmpTibble <- tibble::tibble(
+       Cells = pctDropout_cells,
+       State = factor(rep(paste0("Before ", round(mean(pctDropout_cells),1),
+                                 "%"), length(pctDropout_cells))))
+
+     isExpr_mat = object@effectiveCounts == 0
+     pctDropout_cells <- rowSums(isExpr_mat) / ncol(isExpr_mat) * 100
+     tmpTibble <- rbind(tmpTibble, tibble::tibble(
+       Cells = pctDropout_cells,
+       State = factor(rep(paste0("After ", round(mean(pctDropout_cells),1),
+                                 "%"), length(pctDropout_cells)))))
+
+     p1 = ggplot2::ggplot(tmpTibble, ggplot2::aes(x=Cells)) +
+       ggplot2::geom_density(colour = "deepskyblue3", fill = "deepskyblue1",
+                             alpha=1/3) +
+       ggplot2::xlim(0,100) +
+       ggplot2::theme(axis.ticks = ggplot2::element_line(colour="grey",
+                                                         size=0.5)) +
+       ggplot2::ggtitle("Dropout per cells") +
+       ggplot2::labs(x="Dropout percentage") +
+       ggplot2::facet_grid(~State)
+
+     # Genes dropout
+     isExpr_mat = object@baseCounts == 0
+     pctDropout_genes <- colSums(isExpr_mat) / nrow(isExpr_mat) * 100
+     tmpTibble <- tibble::tibble(
+       Genes = pctDropout_genes,
+       State = factor(rep(paste0("Before ", round(mean(pctDropout_genes),1),
+                                 "%"), length(pctDropout_genes))))
+
+     isExpr_mat = object@effectiveCounts == 0
+     pctDropout_genes <- colSums(isExpr_mat) / nrow(isExpr_mat) * 100
+     tmpTibble <- rbind(tmpTibble, tibble::tibble(
+       Genes = pctDropout_genes,
+       State = factor(rep(paste0("After ", round(mean(pctDropout_genes),1),
+                                 "%"), length(pctDropout_genes)))))
+
+     p2 = ggplot2::ggplot(tmpTibble, ggplot2::aes(x=Genes)) +
+       ggplot2::geom_density(colour = "deepskyblue3", fill = "deepskyblue1",
+                             alpha=1/3) +
+       ggplot2::theme_grey() + ggplot2::xlim(0,100) +
+       ggplot2::labs(x="Dropout percentage") +
+       ggplot2::theme(axis.ticks=ggplot2::element_line(colour="grey", size=0.5)) +
+       ggplot2::ggtitle("Dropout per genes") +
+       ggplot2::facet_grid(~State)
+
+     scater::multiplot(p1,p2)
+
+   })
+
+setMethod("plotDropoutProba", "SCsimSet",
+   function(object) {
+     isExpr_mat = object@baseCounts == 0
+     pctDropout_cells <- rowSums(isExpr_mat) / ncol(isExpr_mat) * 100
+     tmpTibble <- tibble::tibble(
+       Cells = pctDropout_cells,
+       State = factor(rep(paste0("Before ", round(mean(pctDropout_cells),1),
+                                 "%"), length(pctDropout_cells))),
+       Expression = log2(rowMeans(object@baseCounts)+1))
+
+     isExpr_mat = object@effectiveCounts == 0
+     pctDropout_cells <- rowSums(isExpr_mat) / ncol(isExpr_mat) * 100
+     tmpTibble <- rbind(tmpTibble, tibble::tibble(
+       Cells = pctDropout_cells,
+       State = factor(rep(paste0("After ", round(mean(pctDropout_cells),1),
+                                 "%"), length(pctDropout_cells))),
+       Expression = log2(rowMeans(object@effectiveCounts)+1)))
+
+     p1 = ggplot2::ggplot(tmpTibble, ggplot2::aes(x=Expression, y=Cells)) +
+       ggplot2::geom_point(colour = "deepskyblue3", fill = "deepskyblue1",
+                           alpha=1/3) +
+       ggplot2::theme_grey() +
+       ggplot2::labs(y="Dropout %", x="Mean gene expression") +
+       ggplot2::theme(axis.ticks=ggplot2::element_line(colour="grey", size=0.5),
+                      text = ggplot2::element_text(size=15)) +
+       ggplot2::ggtitle(paste0("% Dropout per cells \nMean: ",
+                               round(median(pctDropout_cells),2))) +
+       ggplot2::facet_grid(~State)
+
+     # Genes dropout
+     isExpr_mat = object@baseCounts == 0
+     pctDropout_genes <- colSums(isExpr_mat) / nrow(isExpr_mat) * 100
+     tmpTibble <- tibble::tibble(
+       Genes = pctDropout_genes,
+       State = factor(rep(paste0("Before ", round(mean(pctDropout_genes),1),
+                                 "%"), length(pctDropout_genes))),
+       Expression = log2(colSums(object@baseCounts)+1))
+
+     isExpr_mat = object@effectiveCounts == 0
+     pctDropout_genes <- colSums(isExpr_mat) / nrow(isExpr_mat) * 100
+     tmpTibble <- rbind(tmpTibble, tibble::tibble(
+       Genes = pctDropout_genes,
+       State = factor(rep(paste0("After ", round(mean(pctDropout_genes),1),
+                                 "%"), length(pctDropout_genes))),
+       Expression = log2(colSums(object@effectiveCounts)+1)))
+
+     p2 = ggplot2::ggplot(tmpTibble, ggplot2::aes(x=Expression, y=Genes)) +
+       ggplot2::geom_point(colour = "deepskyblue3", fill = "deepskyblue1",
+                           alpha=1/3) +
+       ggplot2::theme_grey() +
+       ggplot2::labs(y="Dropout %", x="Total counts") +
+       ggplot2::theme(axis.ticks=ggplot2::element_line(colour="grey", size=0.5),
+                      text = ggplot2::element_text(size=15)) +
+       ggplot2::ggtitle(paste0("% Dropout per genes \nMean: ",
+                               round(median(pctDropout_genes),2))) +
+       ggplot2::facet_grid(~State)
+
+
+     scater::multiplot(p1,p2)
+
+
+
+   })

@@ -295,6 +295,10 @@ describeCells <- function(nCells, nPop, pPop, seed,
         tmp_popMixedDP[[length(tmp_popMixedDP)+1]] <-
           c(trajectory[[i]][j], trajectory[[i]][j+1])
       }
+      # Add mixing for last step of trajectory
+      tmp_popMixedDP[[length(tmp_popMixedDP)+1]] <-
+        c(trajectory[[i]][length(trajectory[[i]])],
+          trajectory[[i]][length(trajectory[[i]])-1])
     }
     length(tmp_popMixedDP)
     tmp_popMixedDP <- unique(tmp_popMixedDP)
@@ -472,11 +476,11 @@ describeCells <- function(nCells, nPop, pPop, seed,
                                                                    ] == c])
                   # fixed cells mixing
                   cell <- c(cell, sample(tmpcellPop[tmpcellPop %in%
-                                                      fixedCell[[1+grep(c, mixCell)]]],
-                                         round((length(fixedCell[[1+grep(c, mixCell)]])/2))))
+                                     fixedCell[[1+grep(c, mixCell)]]],
+                      round((length(fixedCell[[1+grep(c, mixCell)]])/2))))
                   cell <- c(cell, sample(tmpcellPop[!tmpcellPop %in%
-                                                      fixedCell[[1+grep(c, mixCell)]]],
-                                         round((length(fixedCell[[1+grep(c, mixCell)]])/2))))
+                                     fixedCell[[1+grep(c, mixCell)]]],
+                      round((length(fixedCell[[1+grep(c, mixCell)]])/2))))
                 }
                 cellsStatus[g, cellPop[!cellPop %in% cell ]] <- i
                 cellsStatus[g, cell[!cell %in% cellPop ]] <- i

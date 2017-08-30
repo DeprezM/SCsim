@@ -44,7 +44,7 @@ computeBatch <- function(nbBatch, cellsPerBatch, batchEffect, nCells, seed) {
     batchEffect <- c(1)
     while (length(batchEffect) < nbBatch) {
       tmpBatch <- sample(c(runif(nbBatch * 2, min = 0.20, max = 0.80),
-                           runif(nbBatch * 2, min = 1.20, max = 4.05)), 1)
+                           runif(nbBatch * 2, min = 1.20, max = 3.05)), 1)
       if ((length(batchEffect) > 5) |
           (abs(batchEffect[length(batchEffect)] - tmpBatch) > 0.5)) {
         batchEffect <- c(batchEffect, tmpBatch)
