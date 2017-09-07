@@ -239,21 +239,25 @@ newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed = 75,
   if (!is.null(nbBatch) & nbBatch > 1){
     for (b in 1:nbBatch){
       effectiveMeans[ , unlist(batch[[1]][b])] <-
-        effectiveMeans[ , unlist(batch[[1]][b])] *
-        as.vector(unlist(batch[[2]][b]))
+        t(t(effectiveMeans[ , unlist(batch[[1]][b])]) *
+        as.vector(unlist(batch[[2]][b])))
     }
   }
 
   # Apply Library Size
-  effectiveMeans <- effectiveMeans * as.vector(unlist(libSize))
+  effectiveMeans <- t(t(effectiveMeans) * as.vector(unlist(libSize)))
   colnames(effectiveMeans) <- colnames(cell_table)
 
   # Apply DEG
   for (g in 1:nrow(effectiveMeans)) {
     for (p in 1:nPop) {
-      tmpCellIndex <- colnames(cell_table[g + 1, cell_table[g + 1, ] == p])
+      if (DEG_table[g, "type"] == "DC"){
+        tmpCellIndex <- colnames(cell_table[1, cell_table[1, ] == p])
+      } else {
+        tmpCellIndex <- colnames(cell_table[g + 1, cell_table[g + 1, ] == p])
+      }
       effectiveMeans[g, tmpCellIndex] <-
-        effectiveMeans[g, tmpCellIndex] * (2^FC_table[g, p])
+        (effectiveMeans[g, tmpCellIndex] * (2^FC_table[g, p]))
     }
   }
   rownames(effectiveMeans) <- rownames(FC_table)
@@ -268,7 +272,7 @@ newSCsimSet <- function(nGenes, nCells, nPop, pPop, seed = 75,
   # Basal counts
   message("-> Compute genes basal counts ")
   set.seed(seed)
-  baseCounts <- matrix(rnbinom(nGenes*nCells, size = 1,
+  baseCounts <- matrix(rnbinom(nGenes*nCells, size = 50,
                                mu = effectiveMeans), ncol = nCells)
   colnames(baseCounts) <- colnames(effectiveMeans)
   rownames(baseCounts) <- rownames(effectiveMeans)
@@ -692,11 +696,15 @@ setMethod("plotDEGTypes", "SCsimSet",
 setMethod("plotCellsContent", "SCsimSet",
    function(object) {
      tmpDF <- object@cell_table
-     tmpDF <- tmpDF[3:nrow(tmpDF),]
+     if (ncol(object@batch_table) == 0) {
+       tmpDF <- tmpDF[2:nrow(tmpDF),]
+     } else {
+       tmpDF <- tmpDF[3:nrow(tmpDF),]
+     }
      # Change DC value - Common DEG
      tmpDF[tmpDF == -1 ] <- object@sampleInfo$nPop + 1
      # Change doublet value
-     tmpDF[, ! object@cell_table[2,] %in% 1:object@sampleInfo$nPop] <- -1
+     tmpDF[, !object@cell_table["cellPop",] %in% 1:object@sampleInfo$nPop] <- -1
 
      # Gene Label & color
      label <- rownames(tmpDF)
@@ -709,14 +717,18 @@ setMethod("plotCellsContent", "SCsimSet",
      names(colorLabel) <- unique(label)
 
      # Cell label & color
-     labelPop <- as.vector(object@cell_table[2,])
+     if (ncol(object@batch_table) == 0) {
+       labelPop <- as.vector(object@cell_table[1,])
+     } else {
+       labelPop <- as.vector(object@cell_table[2,])
+     }
      labelPop[!labelPop %in% 1:object@sampleInfo$nPop] <- "Doublet"
      labelPop[labelPop %in% 1:object@sampleInfo$nPop] <- paste0("Pop ",
-                    labelPop[labelPop %in% 1:object@sampleInfo$nPop])
+                   labelPop[labelPop %in% 1:object@sampleInfo$nPop])
 
-     if (nPop <= 2) {
+     if (object@sampleInfo$nPop <= 2) {
        colorLabelPop <- RColorBrewer::brewer.pal(n=3,
-                           name="YlOrRd")[1:(object@sampleInfo$nPop + 1)]
+             name="YlOrRd")[1:(object@sampleInfo$nPop + 1)]
      } else {
        colorLabelPop <- RColorBrewer::brewer.pal(n=(object@sampleInfo$nPop + 1),
                                                  name="YlOrRd")
@@ -740,9 +752,10 @@ setMethod("plotCellsContent", "SCsimSet",
      pheatmap::pheatmap(tmpDF, color = colorht, border_color = NA,
                         show_rownames = F, show_colnames = F,
                         cluster_rows = F, cluster_cols = F,
-                        annotation_row = annot_row, annotation_col = annot_col,
                         annotation_colors = annot_color,
+                        annotation_row = annot_row, annotation_col = annot_col,
                         annotation_names_row = F, annotation_names_col = F)
+
 
    })
 
@@ -827,8 +840,13 @@ setMethod("plotDropoutQC", "SCsimSet",
        ggplot2::geom_density(colour = "deepskyblue3", fill = "deepskyblue1",
                              alpha=1/3) +
        ggplot2::xlim(0,100) +
-       ggplot2::theme(axis.ticks = ggplot2::element_line(colour="grey",
-                                                         size=0.5)) +
+       ggplot2::theme(
+         axis.ticks = ggplot2::element_line(colour="grey", size=0.5),
+         plot.background = ggplot2::element_rect(fill = "transparent"),
+         panel.background = ggplot2::element_rect(fill = "transparent"),
+         panel.border = ggplot2::element_blank(),
+         panel.grid.major = ggplot2::element_blank(),
+         panel.grid.minor = ggplot2::element_blank()) +
        ggplot2::ggtitle("Dropout per cells") +
        ggplot2::labs(x="Dropout percentage") +
        ggplot2::facet_grid(~State)
@@ -853,7 +871,13 @@ setMethod("plotDropoutQC", "SCsimSet",
                              alpha=1/3) +
        ggplot2::theme_grey() + ggplot2::xlim(0,100) +
        ggplot2::labs(x="Dropout percentage") +
-       ggplot2::theme(axis.ticks=ggplot2::element_line(colour="grey", size=0.5)) +
+       ggplot2::theme(
+         axis.ticks=ggplot2::element_line(colour="grey", size=0.5),
+         plot.background = ggplot2::element_rect(fill = "transparent"),
+         panel.background = ggplot2::element_rect(fill = "transparent"),
+         panel.border = ggplot2::element_blank(),
+         panel.grid.major = ggplot2::element_blank(),
+         panel.grid.minor = ggplot2::element_blank()) +
        ggplot2::ggtitle("Dropout per genes") +
        ggplot2::facet_grid(~State)
 
@@ -884,8 +908,14 @@ setMethod("plotDropoutProba", "SCsimSet",
                            alpha=1/3) +
        ggplot2::theme_grey() +
        ggplot2::labs(y="Dropout %", x="Mean gene expression") +
-       ggplot2::theme(axis.ticks=ggplot2::element_line(colour="grey", size=0.5),
-                      text = ggplot2::element_text(size=15)) +
+       ggplot2::theme(
+         axis.ticks=ggplot2::element_line(colour="grey", size=0.5),
+         text = ggplot2::element_text(size=15),
+         plot.background = ggplot2::element_rect(fill = "transparent"),
+         panel.background = ggplot2::element_rect(fill = "transparent"),
+         panel.border = ggplot2::element_blank(),
+         panel.grid.major = ggplot2::element_blank(),
+         panel.grid.minor = ggplot2::element_blank()) +
        ggplot2::ggtitle(paste0("% Dropout per cells \nMean: ",
                                round(median(pctDropout_cells),2))) +
        ggplot2::facet_grid(~State)
@@ -912,8 +942,14 @@ setMethod("plotDropoutProba", "SCsimSet",
                            alpha=1/3) +
        ggplot2::theme_grey() +
        ggplot2::labs(y="Dropout %", x="Total counts") +
-       ggplot2::theme(axis.ticks=ggplot2::element_line(colour="grey", size=0.5),
-                      text = ggplot2::element_text(size=15)) +
+       ggplot2::theme(
+         axis.ticks=ggplot2::element_line(colour="grey", size=0.5),
+         text = ggplot2::element_text(size=15),
+         plot.background = ggplot2::element_rect(fill = "transparent"),
+         panel.background = ggplot2::element_rect(fill = "transparent"),
+         panel.border = ggplot2::element_blank(),
+         panel.grid.major = ggplot2::element_blank(),
+         panel.grid.minor = ggplot2::element_blank()) +
        ggplot2::ggtitle(paste0("% Dropout per genes \nMean: ",
                                round(median(pctDropout_genes),2))) +
        ggplot2::facet_grid(~State)

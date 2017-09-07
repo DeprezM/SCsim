@@ -554,7 +554,7 @@ computeFC <- function(genesStatus, seed, trajectory = NULL, popMixDP = NULL,
 
 
   ## Create/ Initialize trueFc dataframe
-  trueFc <- data.frame(matrix(data = 1,
+  trueFc <- data.frame(matrix(data = 0,
                               nrow = nGenes,
                               ncol = nPop))
   rownames(trueFc) <- genesStatus$geneLabel
@@ -575,76 +575,85 @@ computeFC <- function(genesStatus, seed, trajectory = NULL, popMixDP = NULL,
     if (!is.null(trajectory)){
       for (x in 1:nPop){
         nbTraj <- grep(x, trajectory)
-        tmpDC <- genesStatus[genesStatus$population == x &
-                               genesStatus$type == "DC", "geneLabel"]
-        if (length(nbTraj) > 1){
-          trajIndex <- list()
-          for (i in 1:(length(nbTraj) - 1)) {
-            trajIndex <- c(trajIndex, list(sample(tmpDC,
-                               floor(length(tmpDC)/length(nbTraj)))))
-            tmpDC <- tmpDC[!tmpDC %in% trajIndex[[i]]]
-          }
-          trajIndex <- c(trajIndex, list(tmpDC))
-        } else {
-          trajIndex <- list(tmpDC)
-        }
+        if (length(nbTraj) != 0) {
+          popNotTraj <- 1:nPop
+          popNotTraj <- popNotTraj[1:nPop != x]
+          tmpDC <- genesStatus[genesStatus$population %in% x &
+                                 genesStatus$type == "DC", "geneLabel"]
+          trueFc[tmpDC, popNotTraj] <- -10
 
-        for (i in 1:length(nbTraj)) {
-          tmpTraj <- trajectory[[nbTraj[i]]]
-          # Increase expression
-          trajIndexInc <- trajIndex[[i]][1:floor(length(trajIndex[[i]])/2)]
-          # Decrease expression
-          trajIndexDec <- trajIndex[[i]][floor(length(trajIndex[[i]])/2):
-                                           length(trajIndex[[i]])]
-
-          # Down half
-          for (t in trajIndexInc) {
-            tmp_sample <- sample(DownFc,
-                                 length(tmpTraj[1:floor(length(tmpTraj)/2)]))
-            if (any(duplicated(tmp_sample))) {
-              tmp_sample[duplicated(tmp_sample)] <-
-                2*tmp_sample[duplicated(tmp_sample)]
+          tmpDC <- genesStatus[genesStatus$population == x &
+                                 genesStatus$type == "DC", "geneLabel"]
+          if (length(nbTraj) > 1){
+            trajIndex <- list()
+            for (i in 1:(length(nbTraj) - 1)) {
+              trajIndex <- c(trajIndex, list(sample(tmpDC,
+                                 floor(length(tmpDC)/length(nbTraj)))))
+              tmpDC <- tmpDC[!tmpDC %in% trajIndex[[i]]]
             }
-            trueFc[t, tmpTraj[1:floor(length(tmpTraj)/2)]] <- sort(tmp_sample)
-
-            tmp_sample <- sample(UpFc, length(tmpTraj[(ceiling(
-              length(tmpTraj)/2)+1):length(tmpTraj)]))
-            if (any(duplicated(tmp_sample))) {
-              tmp_sample[duplicated(tmp_sample)] <-
-                2*tmp_sample[duplicated(tmp_sample)]
-            }
-            trueFc[t, tmpTraj[(ceiling(length(tmpTraj)/2)
-                               +1):length(tmpTraj)]] <- sort(tmp_sample)
+            trajIndex <- c(trajIndex, list(tmpDC))
+          } else {
+            trajIndex <- list(tmpDC)
           }
 
-          for (t in trajIndexDec) {
-            tmp_sample <- sample(UpFc,
-                                 length(tmpTraj[1:floor(length(tmpTraj)/2)]))
-            if (any(duplicated(tmp_sample))) {
-              tmp_sample[duplicated(tmp_sample)] <-
-                2*tmp_sample[duplicated(tmp_sample)]
-            }
-            if (length(tmp_sample) != 1) {
-              trueFc[t, tmpTraj[1:floor(length(tmpTraj)/2)]] <- sort(tmp_sample,
-                                                                decreasing = T)
-            } else {
-              trueFc[t, tmpTraj[1:floor(length(tmpTraj)/2)]] <- tmp_sample
-            }
-            tmp_sample <- sample(DownFc, length(tmpTraj[(
-              ceiling(length(tmpTraj)/2)+1):length(tmpTraj)]))
-            if (any(duplicated(tmp_sample))) {
-              tmp_sample[duplicated(tmp_sample)] <-
-                2*tmp_sample[duplicated(tmp_sample)]
-            }
-            if (length(tmp_sample) != 1) {
-              trueFc[t, tmpTraj[(ceiling(length(tmpTraj)/2)
-                     +1):length(tmpTraj)]] <- sort(tmp_sample, decreasing = T)
-            } else {
-              trueFc[t, tmpTraj[(ceiling(length(tmpTraj)/2)
-                                 +1):length(tmpTraj)]] <- tmp_sample
+          for (i in 1:length(nbTraj)) {
+            tmpTraj <- trajectory[[nbTraj[i]]]
+            # Increase expression
+            trajIndexInc <- trajIndex[[i]][1:floor(length(trajIndex[[i]])/2)]
+            # Decrease expression
+            trajIndexDec <- trajIndex[[i]][(floor(length(trajIndex[[i]])/2)+1):
+                                             length(trajIndex[[i]])]
+
+            # Down half
+            for (t in trajIndexInc) {
+              tmp_sample <- sample(DownFc,
+                                   length(tmpTraj[1:floor(length(tmpTraj)/2)]))
+              if (any(duplicated(tmp_sample))) {
+                tmp_sample[duplicated(tmp_sample)] <-
+                  2*tmp_sample[duplicated(tmp_sample)]
+              }
+              trueFc[t, tmpTraj[1:floor(length(tmpTraj)/2)]] <- sort(tmp_sample)
+
+              tmp_sample <- sample(UpFc, length(tmpTraj[(floor(
+                length(tmpTraj)/2)+1):(length(tmpTraj) - 1)]))
+              if (any(duplicated(tmp_sample))) {
+                tmp_sample[duplicated(tmp_sample)] <-
+                  2*tmp_sample[duplicated(tmp_sample)]
+              }
+              trueFc[t, tmpTraj[(floor(length(tmpTraj)/2)
+                                 +1):length(tmpTraj)]] <- c(0,sort(tmp_sample))
             }
 
+            for (t in trajIndexDec) {
+              tmp_sample <- sample(UpFc,
+                                   length(tmpTraj[1:floor(length(tmpTraj)/2)]))
+              if (any(duplicated(tmp_sample))) {
+                tmp_sample[duplicated(tmp_sample)] <-
+                  2*tmp_sample[duplicated(tmp_sample)]
+              }
+              if (length(tmp_sample) != 1) {
+                trueFc[t, tmpTraj[1:floor(length(tmpTraj)/2)]] <- sort(tmp_sample,
+                                                                       decreasing = T)
+              } else {
+                trueFc[t, tmpTraj[1:floor(length(tmpTraj)/2)]] <- tmp_sample
+              }
+              tmp_sample <- sample(DownFc, length(tmpTraj[(
+                floor(length(tmpTraj)/2)+1):(length(tmpTraj)-1)]))
+              if (any(duplicated(tmp_sample))) {
+                tmp_sample[duplicated(tmp_sample)] <-
+                  2*tmp_sample[duplicated(tmp_sample)]
+              }
+              if (length(tmp_sample) != 1) {
+                trueFc[t, tmpTraj[(floor(length(tmpTraj)/2)
+                                   +1):length(tmpTraj)]] <- c(0,sort(tmp_sample,
+                                                                 decreasing = T))
+              } else {
+                trueFc[t, tmpTraj[(floor(length(tmpTraj)/2)
+                                   +1):length(tmpTraj)]] <- c(0,tmp_sample)
+              }
 
+
+            }
           }
         }
       }
